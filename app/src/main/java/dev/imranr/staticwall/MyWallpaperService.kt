@@ -11,6 +11,8 @@ import kotlinx.coroutines.*
 import kotlin.random.Random
 
 val initColour = Color.parseColor("#000000")
+@OptIn(ExperimentalStdlibApi::class)
+val initColourString = (dev.imranr.staticwall.initColour.toHexString(format = HexFormat.UpperCase)).substring(2)
 const val initFPS = 24
 const val initLoopSeconds = 5
 const val initScaleFactor = 2
