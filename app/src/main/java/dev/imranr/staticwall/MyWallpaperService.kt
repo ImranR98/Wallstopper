@@ -6,10 +6,15 @@ import android.os.Looper
 import android.service.wallpaper.WallpaperService
 import android.view.SurfaceHolder
 import android.content.SharedPreferences
+import android.util.Log
 import kotlinx.coroutines.*
 import kotlin.random.Random
 
-val initColour = android.graphics.Color.parseColor("#FF0000")
+val initColour = Color.parseColor("#000000")
+const val initFPS = 24
+const val initLoopSeconds = 5
+const val initScaleFactor = 2
+const val initMaxNoiseBrightness = 70
 
 class MyWallpaperService : WallpaperService() {
 
@@ -23,13 +28,22 @@ class MyWallpaperService : WallpaperService() {
         private var visible = true
         private val prefs = getSharedPreferences("wallpaper_prefs", MODE_PRIVATE)
         private var backgroundColor = initColour
-        private var noiseBitmap: Bitmap? = null
-
-        // Lower resolution scale factor (e.g., quarter the resolution)
-        private val scaleFactor = 6
-
-        // Coroutine scope for parallel noise generation
+        private var wallpaperWidth: Int = 0
+        private var wallpaperHeight: Int = 0
         private val coroutineScope = CoroutineScope(Dispatchers.Default + Job())
+        private var currentFrameIndex = 0
+        private var frameGenerationJob: Job? = null
+
+        // Speed/quality params
+        private val FPS = initFPS
+        private val loopSeconds = initLoopSeconds
+        private val scaleFactor = initScaleFactor
+        private val maxNoiseBrightness = initMaxNoiseBrightness
+
+        // Derived params
+        private val frameDurationMillis = 1000L / FPS // Frame duration for 24 FPS
+        private val totalFrames = loopSeconds * FPS // Total frames for 3 seconds at 24 FPS
+        private var noiseFrames = arrayOfNulls<Bitmap>(totalFrames)
 
         init {
             prefs.registerOnSharedPreferenceChangeListener(this)
@@ -46,7 +60,11 @@ class MyWallpaperService : WallpaperService() {
         }
 
         override fun onSurfaceCreated(holder: SurfaceHolder) {
+            Log.e("MyWallpaperService", "onSurfaceCreated")
             super.onSurfaceCreated(holder)
+            wallpaperWidth = holder.surfaceFrame.width() / scaleFactor
+            wallpaperHeight = holder.surfaceFrame.height() / scaleFactor
+            generateNoiseFrames()
             draw()
             handler.post(animationRunnable) // Start animation loop
         }
@@ -58,9 +76,13 @@ class MyWallpaperService : WallpaperService() {
         }
 
         override fun onDestroy() {
+            Log.e("MyWallpaperService", "onDestroy")
             super.onDestroy()
             prefs.unregisterOnSharedPreferenceChangeListener(this)
-            coroutineScope.cancel() // Cancel any running coroutines
+            frameGenerationJob?.cancel() // Cancel frame generation job if active
+            noiseFrames.forEach {
+                it?.recycle()
+            } // Clean up generated bitmaps
         }
 
         override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
@@ -77,52 +99,52 @@ class MyWallpaperService : WallpaperService() {
             }
         }
 
-        // Animation runnable to update noise every 1/24th of a second
+        // Animation runnable to update the current frame
         private val animationRunnable = object : Runnable {
             override fun run() {
-                if (visible) {
-                    coroutineScope.launch {
-                        generateNoiseBitmapParallel() // Generate new noise in parallel
-                        withContext(Dispatchers.Main) {
-                            draw() // Redraw with the new noise on the main thread
-                        }
+                if (visible && noiseFrames.isNotEmpty()) {
+                    draw() // Draw the current frame
+                    val nextFrameIndex = (currentFrameIndex + 1) % noiseFrames.size
+                    if (noiseFrames[nextFrameIndex] != null) {
+                        currentFrameIndex = nextFrameIndex // Loop back to the start
+                    } else {
+                        currentFrameIndex = 0
                     }
-                    handler.postDelayed(this, 100) // 24 FPS
+                    handler.postDelayed(this, frameDurationMillis) // Schedule the next frame
                 }
             }
         }
 
         // Parallel noise generation using Kotlin coroutines at a lower resolution
-        private suspend fun generateNoiseBitmapParallel() {
-            val width = surfaceHolder.surfaceFrame.width() / scaleFactor
-            val height = surfaceHolder.surfaceFrame.height() / scaleFactor
-
+        private suspend fun generateNoiseBitmapParallel(width: Int, height: Int): Bitmap {
             // Only create a new bitmap if the size changes
-            if (noiseBitmap == null || noiseBitmap?.width != width || noiseBitmap?.height != height) {
-                noiseBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            }
-
+            val noiseBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             val pixels = IntArray(width * height)
-
             // Split the work into parallel coroutines to fill the pixels array
             val chunkSize = pixels.size / Runtime.getRuntime().availableProcessors()
             val jobs = mutableListOf<Job>()
-
             for (i in pixels.indices step chunkSize) {
                 val end = minOf(i + chunkSize, pixels.size)
                 jobs.add(coroutineScope.launch {
                     for (j in i until end) {
                         // Generate random grayscale noise and make it semi-transparent
-                        val noise = Random.nextInt(0, 256)
+                        val noise = Random.nextInt(0, maxNoiseBrightness)
                         pixels[j] = Color.argb(50, noise, noise, noise) // Alpha = 50 for transparency
                     }
                 })
             }
-
-            // Wait for all coroutines to finish
             jobs.joinAll()
+            noiseBitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+            return noiseBitmap
+        }
 
-            noiseBitmap?.setPixels(pixels, 0, width, 0, 0, width, height)
+        private fun generateNoiseFrames() {
+            frameGenerationJob = CoroutineScope(Dispatchers.Default).launch {
+                for (i in 0 until totalFrames) {
+                    noiseFrames[i] = generateNoiseBitmapParallel(wallpaperWidth, wallpaperHeight)
+                }
+                Log.e("MyWallpaperService", "Finished generating frames.")
+            }
         }
 
         private fun draw() {
@@ -135,13 +157,15 @@ class MyWallpaperService : WallpaperService() {
                     // Draw the background color
                     canvas.drawColor(backgroundColor)
 
-                    // Scale up and overlay the noise
-                    noiseBitmap?.let {
-                        val matrix = Matrix().apply {
-                            postScale(scaleFactor.toFloat(), scaleFactor.toFloat())
+                    // Overlay the current noise frame if it exists
+                    if (currentFrameIndex < noiseFrames.size) {
+                        noiseFrames[currentFrameIndex]?.let {
+                            val matrix = Matrix().apply {
+                                postScale(scaleFactor.toFloat(), scaleFactor.toFloat())
+                            }
+                            val scaledNoiseBitmap = Bitmap.createBitmap(it, 0, 0, it.width, it.height, matrix, false)
+                            canvas.drawBitmap(scaledNoiseBitmap, 0f, 0f, noisePaint)
                         }
-                        val scaledNoiseBitmap = Bitmap.createBitmap(it, 0, 0, it.width, it.height, matrix, false)
-                        canvas.drawBitmap(scaledNoiseBitmap, 0f, 0f, noisePaint)
                     }
                 }
 
@@ -153,3 +177,4 @@ class MyWallpaperService : WallpaperService() {
         }
     }
 }
+
