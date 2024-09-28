@@ -81,6 +81,7 @@ class MainActivity : ComponentActivity() {
                     var fpsInput by remember { mutableStateOf(TextFieldValue(prefs.getInt("fps", initFPS).toString())) }
                     var loopSecondsInput by remember { mutableStateOf(TextFieldValue(prefs.getInt("loop_seconds", initLoopSeconds).toString())) }
                     var scaleFactorInput by remember { mutableStateOf(TextFieldValue(prefs.getInt("scale_factor", initScaleFactor).toString())) }
+                    var tilingFactorInput by remember { mutableStateOf(TextFieldValue(prefs.getInt("tiling_factor", initTilingFactor).toString())) }
                     var maxNoiseBrightnessInput by remember { mutableStateOf(TextFieldValue(prefs.getInt("max_noise_brightness", initMaxNoiseBrightness).toString())) }
                     Column(
                         modifier = Modifier
@@ -150,6 +151,17 @@ class MainActivity : ComponentActivity() {
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                             )
                             TextField(
+                                value = tilingFactorInput,
+                                onValueChange = {
+                                    if (it.text.isEmpty() || it.text.matches(Regex("[0-9]+")) && it.text.toInt() >= 1 && it.text.toInt() <= 8) {
+                                        tilingFactorInput = it
+                                    }
+                                },
+                                label = { Text("Tiling Factor (1-8)") },
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            )
+                            TextField(
                                 value = maxNoiseBrightnessInput,
                                 onValueChange = {
                                     if (it.text.isEmpty() || it.text.matches(Regex("[0-9]+")) && it.text.toInt() >= 1 && it.text.toInt() <= 256) {
@@ -181,6 +193,9 @@ class MainActivity : ComponentActivity() {
                                         val scaleFactor =
                                             scaleFactorInput.text.toIntOrNull()?.coerceIn(1, 8)
                                                 ?: initScaleFactor
+                                        val tilingFactor =
+                                            tilingFactorInput.text.toIntOrNull()?.coerceIn(1, 8)
+                                                ?: initTilingFactor
                                         val maxNoiseBrightness =
                                             maxNoiseBrightnessInput.text.toIntOrNull()
                                                 ?.coerceIn(1, 256)
@@ -197,6 +212,7 @@ class MainActivity : ComponentActivity() {
                                             putInt("fps", fps)
                                             putInt("loop_seconds", loopSeconds)
                                             putInt("scale_factor", scaleFactor)
+                                            putInt("tiling_factor", tilingFactor)
                                             putInt("max_noise_brightness", maxNoiseBrightness)
                                             apply()
                                         }

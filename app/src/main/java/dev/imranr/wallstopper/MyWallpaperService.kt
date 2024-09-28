@@ -6,7 +6,6 @@ import android.os.Looper
 import android.service.wallpaper.WallpaperService
 import android.view.SurfaceHolder
 import android.content.SharedPreferences
-import android.util.Log
 import kotlinx.coroutines.*
 import kotlin.random.Random
 import androidx.lifecycle.LiveData
@@ -14,10 +13,11 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 
 val initColour = Color.parseColor("#000000")
-const val initFPS = 24
-const val initLoopSeconds = 5
+const val initFPS = 60
+const val initLoopSeconds = 4
 const val initScaleFactor = 2
-const val initMaxNoiseBrightness = 70
+const val initMaxNoiseBrightness = 100
+const val initTilingFactor = 6
 
 class NoiseGenerationViewModel : ViewModel() {
     private val _value = MutableLiveData<Float?>()
@@ -55,6 +55,7 @@ class MyWallpaperService : WallpaperService() {
         private var fps = prefs.getInt("fps", initFPS)
         private var loopSeconds = prefs.getInt("loop_seconds", initLoopSeconds)
         private var scaleFactor = prefs.getInt("scale_factor", initScaleFactor)
+        private var tilingFactor = prefs.getInt("tiling_factor", initTilingFactor)
         private var maxNoiseBrightness = prefs.getInt("max_noise_brightness", initMaxNoiseBrightness)
         private var noiseFrames = arrayOfNulls<Bitmap>(loopSeconds * fps)
 
@@ -77,10 +78,9 @@ class MyWallpaperService : WallpaperService() {
         }
 
         override fun onSurfaceCreated(holder: SurfaceHolder) {
-            Log.e("MyWallpaperService", "onSurfaceCreated")
             super.onSurfaceCreated(holder)
-            wallpaperWidth = holder.surfaceFrame.width() / scaleFactor
-            wallpaperHeight = holder.surfaceFrame.height() / scaleFactor
+            wallpaperWidth = holder.surfaceFrame.width()
+            wallpaperHeight = holder.surfaceFrame.height()
             generateNoiseFrames()
             draw()
             handler.post(animationRunnable) // Start animation loop
@@ -93,7 +93,6 @@ class MyWallpaperService : WallpaperService() {
         }
 
         override fun onDestroy() {
-            Log.e("MyWallpaperService", "onDestroy")
             super.onDestroy()
             prefs.unregisterOnSharedPreferenceChangeListener(this)
             frameGenerationJob?.cancel() // Cancel frame generation job if active
@@ -119,13 +118,16 @@ class MyWallpaperService : WallpaperService() {
                     "scale_factor" -> {
                         scaleFactor = sharedPreferences.getInt("scale_factor", 1)
                     }
+                    "tiling_factor" -> {
+                        tilingFactor = sharedPreferences.getInt("tiling_factor", 1)
+                    }
                     "max_noise_brightness" -> {
                         maxNoiseBrightness = sharedPreferences.getInt("max_noise_brightness", 256)
                     }
                 }
             }
             if (restart) {
-                noiseFrames = arrayOfNulls<Bitmap>(loopSeconds * fps)
+                noiseFrames = arrayOfNulls(loopSeconds * fps)
                 for (i in noiseFrames.indices) {
                     noiseFrames[i] = null
                 }
@@ -176,16 +178,40 @@ class MyWallpaperService : WallpaperService() {
         }
 
         private fun generateNoiseFrames() {
-            Log.e("MyWallpaperService", "Starting to generate frames.")
+            val wallpaperTileWidth = wallpaperWidth / (tilingFactor * scaleFactor)
+            val wallpaperTileHeight = wallpaperHeight / (tilingFactor * scaleFactor)
             frameGenerationJob?.cancel()
             frameGenerationJob = CoroutineScope(Dispatchers.Default).launch {
                 for (i in noiseFrames.indices) {
-                    noiseFrames[i] = generateNoiseBitmapParallel(wallpaperWidth, wallpaperHeight)
+                    noiseFrames[i] = generateNoiseBitmapParallel(wallpaperTileWidth, wallpaperTileHeight)
                     noiseGenerationViewModel.updateValue((i.toFloat() / noiseFrames.size))
                 }
                 noiseGenerationViewModel.updateValue(null)
-                Log.e("MyWallpaperService", "Finished generating frames.")
             }
+        }
+
+        private fun tileBitmap(originalBitmap: Bitmap, multiplier: Int): Bitmap? {
+            // Calculate the size of the new bitmap
+            val newWidth = originalBitmap.width * multiplier
+            val newHeight = originalBitmap.height * multiplier
+
+            // Create a new bitmap with the calculated size
+            val tiledBitmap =
+                originalBitmap.config?.let { Bitmap.createBitmap(newWidth, newHeight, it) }
+            val paint = Paint()
+
+            // Draw the original bitmap in a grid based on the scale factor
+            for (x in 0 until multiplier) {
+                for (y in 0 until multiplier) {
+                    // Calculate the position for each tile
+                    val left = x * originalBitmap.width
+                    val top = y * originalBitmap.height
+                    tiledBitmap?.let { Canvas(it) }
+                        ?.drawBitmap(originalBitmap, left.toFloat(), top.toFloat(), paint)
+                }
+            }
+
+            return tiledBitmap
         }
 
         private fun draw() {
@@ -201,11 +227,26 @@ class MyWallpaperService : WallpaperService() {
                     // Overlay the current noise frame if it exists
                     if (currentFrameIndex < noiseFrames.size) {
                         noiseFrames[currentFrameIndex]?.let {
-                            val matrix = Matrix().apply {
-                                postScale(scaleFactor.toFloat(), scaleFactor.toFloat())
+
+                        }
+                    }
+                }
+
+                if (canvas != null) {
+                    // Draw the background color
+                    canvas.drawColor(backgroundColor)
+
+                    // Overlay the current noise frame if it exists
+                    if (currentFrameIndex < noiseFrames.size) {
+                        noiseFrames[currentFrameIndex]?.let {
+                            val noiseBitmap = tileBitmap(it, tilingFactor)
+                            if (noiseBitmap != null) {
+                                val matrix = Matrix().apply {
+                                    postScale(scaleFactor.toFloat(), scaleFactor.toFloat())
+                                }
+                                val scaledNoiseBitmap = Bitmap.createBitmap(noiseBitmap, 0, 0, noiseBitmap.width, noiseBitmap.height, matrix, false)
+                                canvas.drawBitmap(scaledNoiseBitmap, 0f, 0f, noisePaint)
                             }
-                            val scaledNoiseBitmap = Bitmap.createBitmap(it, 0, 0, it.width, it.height, matrix, false)
-                            canvas.drawBitmap(scaledNoiseBitmap, 0f, 0f, noisePaint)
                         }
                     }
                 }
