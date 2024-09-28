@@ -4,13 +4,13 @@ plugins {
 }
 
 android {
-    namespace = "dev.imranr.staticwall"
-    compileSdk = 34
+    namespace = "dev.imranr.wallstopper"
+    compileSdk = 35
 
     defaultConfig {
-        applicationId = "dev.imranr.staticwall"
+        applicationId = "dev.imranr.wallstopper"
         minSdk = 24
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
@@ -66,4 +66,5 @@ dependencies {
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+    implementation("androidx.activity:activity-ktx:1.9.2")
 }

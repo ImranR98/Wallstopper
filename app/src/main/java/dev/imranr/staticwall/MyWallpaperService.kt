@@ -1,4 +1,4 @@
-package dev.imranr.staticwall
+package dev.imranr.wallstopper
 
 import android.graphics.*
 import android.os.Handler

@@ -1,4 +1,4 @@
-package dev.imranr.staticwall.ui.theme
+package dev.imranr.wallstopper.ui.theme
 
 import android.app.Activity
 import android.os.Build

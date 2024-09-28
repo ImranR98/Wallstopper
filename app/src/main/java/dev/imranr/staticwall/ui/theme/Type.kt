@@ -1,4 +1,4 @@
-package dev.imranr.staticwall.ui.theme
+package dev.imranr.wallstopper.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle

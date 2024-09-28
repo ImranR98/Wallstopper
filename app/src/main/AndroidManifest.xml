@@ -10,12 +10,12 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.StaticWall"
+        android:theme="@style/Theme.Wallstopper"
         tools:targetApi="31">
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.StaticWall">
+            android:theme="@style/Theme.Wallstopper">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

@@ -13,6 +13,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Static Wall"
+rootProject.name = "Wallstopper"
 include(":app")
  

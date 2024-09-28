@@ -1,4 +1,4 @@
-package dev.imranr.staticwall
+package dev.imranr.wallstopper
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*

@@ -1,14 +1,13 @@
-package dev.imranr.staticwall
+package dev.imranr.wallstopper
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
-import dev.imranr.staticwall.ui.theme.WallstopperTheme
+import dev.imranr.wallstopper.ui.theme.WallstopperTheme
 import android.content.Intent
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Button
@@ -17,13 +16,17 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.foundation.layout.*
 import androidx.compose.ui.unit.dp
 import android.graphics.Color
+import android.util.Log
 import androidx.compose.material3.*
 import androidx.compose.ui.Alignment
 import android.widget.Toast
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.sp
-import androidx.core.view.WindowCompat
 
 class MainActivity : ComponentActivity() {
     private val noiseGenerationViewModel: NoiseGenerationViewModel by lazy {
@@ -32,11 +35,36 @@ class MainActivity : ComponentActivity() {
 
     @OptIn(ExperimentalStdlibApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Make sure we can control the status and navigation bar
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         val prefs = getSharedPreferences("wallpaper_prefs", MODE_PRIVATE)
 
         setContent {
+            val lightTheme = !isSystemInDarkTheme()
+            val barColor = MaterialTheme.colorScheme.background.toArgb()
+            LaunchedEffect(lightTheme) {
+                if (lightTheme) {
+                    enableEdgeToEdge(
+                        statusBarStyle = SystemBarStyle.light(
+                            barColor, barColor,
+                        ),
+                        navigationBarStyle = SystemBarStyle.light(
+                            barColor, barColor,
+                        ),
+                    )
+                } else {
+                    Log.e("AAA", "BBB")
+                    Log.e("AAA", barColor.toHexString())
+                    enableEdgeToEdge(
+                        statusBarStyle = SystemBarStyle.dark(
+                            barColor.inv(),
+                        ),
+                        navigationBarStyle = SystemBarStyle.dark(
+                            barColor.inv(),
+                        ),
+                    )
+                }
+            }
             var frameGenerationProgress by remember { mutableStateOf<Float?>(null) }
 
             // Observe LiveData from SharedViewModel
@@ -45,7 +73,6 @@ class MainActivity : ComponentActivity() {
             }
 
             WallstopperTheme {
-                // A surface container using the 'background' color from the theme
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -64,7 +91,7 @@ class MainActivity : ComponentActivity() {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 16.dp, bottom = 16.dp),
+                                .padding(top = 80.dp, bottom = 16.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
