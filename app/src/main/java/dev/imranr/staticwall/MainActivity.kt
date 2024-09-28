@@ -31,14 +31,22 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.unit.dp
+import android.content.SharedPreferences
+import android.graphics.Color
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.unit.dp
 
 class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalStdlibApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val prefs = getSharedPreferences("wallpaper_prefs", MODE_PRIVATE)
         setContent {
             StaticWallTheme {
                 // A surface container using the 'background' color from the theme
@@ -46,19 +54,13 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    var colorText by remember { mutableStateOf(TextFieldValue((initColour.toHexString(format = HexFormat.UpperCase)).substring(2))) }
-                    var isValidColor by remember { mutableStateOf(true) }
-                    var currentColor by remember { mutableStateOf(Color(initColour)) }
+                    var colorInput by remember { mutableStateOf(TextFieldValue((initColour.toHexString(format = HexFormat.UpperCase)).substring(2))) }
+                    var fpsInput by remember { mutableStateOf(TextFieldValue(initFPS.toString())) }
+                    var loopSecondsInput by remember { mutableStateOf(TextFieldValue(initLoopSeconds.toString())) }
+                    var scaleFactorInput by remember { mutableStateOf(TextFieldValue(initScaleFactor.toString())) }
+                    var maxNoiseBrightnessInput by remember { mutableStateOf(TextFieldValue(
+                        initMaxNoiseBrightness.toString())) }
 
-                    // Function to validate the color input
-                    fun isValidHexColor(input: String): Boolean {
-                        return input.length == 6 && input.all { it.isDigit() || it in 'A'..'F' || it in 'a'..'f' }
-                    }
-
-                    // Validate the input
-                    isValidColor = isValidHexColor(colorText.text)
-
-                    // UI with Jetpack Compose
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -66,54 +68,64 @@ class MainActivity : ComponentActivity() {
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        // Preview box
-                        Box(
-                            modifier = Modifier
-                                .size(100.dp)
-                                .background(currentColor)
-                                .padding(16.dp)
+                        TextField(
+                            value = colorInput,
+                            onValueChange = { colorInput = it },
+                            label = { Text("Background Color (Hex, without #)") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        TextField(
+                            value = fpsInput,
+                            onValueChange = { fpsInput = it },
+                            label = { Text("FPS (1-300)") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        TextField(
+                            value = loopSecondsInput,
+                            onValueChange = { loopSecondsInput = it },
+                            label = { Text("Loop Seconds (1-10)") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        TextField(
+                            value = scaleFactorInput,
+                            onValueChange = { scaleFactorInput = it },
+                            label = { Text("Scale Factor (1-8)") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        TextField(
+                            value = maxNoiseBrightnessInput,
+                            onValueChange = { maxNoiseBrightnessInput = it },
+                            label = { Text("Max Noise Brightness (1-256)") },
+                            modifier = Modifier.fillMaxWidth()
                         )
 
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Text input for color
-                        BasicTextField(
-                            value = colorText,
-                            onValueChange = { colorText = it },
-                            modifier = Modifier
-                                .width(150.dp)
-                                .align(Alignment.CenterHorizontally)
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Set color button
                         Button(
                             onClick = {
-                                val colorString = "#" + colorText.text // Prepend `#` to hex code
-                                val color = try {
-                                    android.graphics.Color.parseColor(colorString)
-                                } catch (e: IllegalArgumentException) {
-                                    print(e);
-                                    initColour // Fallback color
+                                // Validate and save inputs
+                                val colorHex = colorInput.text
+                                val fps = fpsInput.text.toIntOrNull()?.coerceIn(1, 300) ?: initFPS
+                                val loopSeconds = loopSecondsInput.text.toIntOrNull()?.coerceIn(1, 10) ?: initLoopSeconds
+                                val scaleFactor = scaleFactorInput.text.toIntOrNull()?.coerceIn(1, 8) ?: initScaleFactor
+                                val maxNoiseBrightness = maxNoiseBrightnessInput.text.toIntOrNull()?.coerceIn(1, 256) ?: initMaxNoiseBrightness
+
+                                val color = if (colorHex.startsWith("#")) {
+                                    Color.parseColor(colorHex)
+                                } else {
+                                    Color.parseColor("#$colorHex")
                                 }
 
-                                // Save the selected color in SharedPreferences
-                                val sharedPrefs = getSharedPreferences("wallpaper_prefs", MODE_PRIVATE)
-                                sharedPrefs.edit().putInt("wallpaper_color", color).apply()
-
-                                // Update preview
-                                currentColor = Color(color)
-
+                                with(prefs.edit()) {
+                                    putInt("wallpaper_color", color)
+                                    putInt("fps", fps)
+                                    putInt("loop_seconds", loopSeconds)
+                                    putInt("scale_factor", scaleFactor)
+                                    putInt("max_noise_brightness", maxNoiseBrightness)
+                                    apply()
+                                }
                             },
-                            enabled = isValidColor
+                            modifier = Modifier.padding(top = 16.dp)
                         ) {
-                            Text("Set Wallpaper Color")
-                        }
-
-                        // Show validation message if input is invalid
-                        if (!isValidColor) {
-                            Text(text = "Invalid color! Please enter a valid 6-character hex code.", color = Color.Red)
+                            Text("Update Wallpaper Settings")
                         }
                     }
                 }

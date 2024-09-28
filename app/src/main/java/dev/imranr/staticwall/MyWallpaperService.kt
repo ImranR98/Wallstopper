@@ -35,14 +35,14 @@ class MyWallpaperService : WallpaperService() {
         private var frameGenerationJob: Job? = null
 
         // Speed/quality params
-        private val FPS = initFPS
-        private val loopSeconds = initLoopSeconds
-        private val scaleFactor = initScaleFactor
-        private val maxNoiseBrightness = initMaxNoiseBrightness
+        private var FPS = initFPS
+        private var loopSeconds = initLoopSeconds
+        private var scaleFactor = initScaleFactor
+        private var maxNoiseBrightness = initMaxNoiseBrightness
 
         // Derived params
-        private val frameDurationMillis = 1000L / FPS // Frame duration for 24 FPS
-        private val totalFrames = loopSeconds * FPS // Total frames for 3 seconds at 24 FPS
+        private var frameDurationMillis = 1000L / FPS
+        private var totalFrames = loopSeconds * FPS
         private var noiseFrames = arrayOfNulls<Bitmap>(totalFrames)
 
         init {
@@ -86,14 +86,29 @@ class MyWallpaperService : WallpaperService() {
         }
 
         override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
-            if (key == "wallpaper_color" && sharedPreferences != null) {
-                val newColor = sharedPreferences.getInt("wallpaper_color", initColour)
-                updateColor(newColor)
+            var restart = true
+            if (sharedPreferences != null) {
+                if (key == "wallpaper_color") {
+                    backgroundColor = sharedPreferences.getInt("wallpaper_color", initColour)
+                    restart = false
+                } else if (key == "fps") {
+                    FPS = sharedPreferences.getInt("fps", 24)
+                } else if (key == "loop_seconds") {
+                    loopSeconds = sharedPreferences.getInt("loop_seconds", 3)
+                } else if (key == "scale_factor") {
+                    scaleFactor = sharedPreferences.getInt("scale_factor", 1)
+                } else if (key == "max_noise_brightness") {
+                    maxNoiseBrightness = sharedPreferences.getInt("max_noise_brightness", 256)
+                }
             }
-        }
-
-        private fun updateColor(newColor: Int) {
-            backgroundColor = newColor
+            if (restart) {
+                frameDurationMillis = 1000L / FPS
+                totalFrames = loopSeconds * FPS
+                for (i in 0 until totalFrames) {
+                    noiseFrames[i] = null
+                }
+                generateNoiseFrames()
+            }
             if (visible) {
                 draw()
             }
@@ -139,6 +154,8 @@ class MyWallpaperService : WallpaperService() {
         }
 
         private fun generateNoiseFrames() {
+            Log.e("MyWallpaperService", "Starting to generate frames.")
+            frameGenerationJob?.cancel()
             frameGenerationJob = CoroutineScope(Dispatchers.Default).launch {
                 for (i in 0 until totalFrames) {
                     noiseFrames[i] = generateNoiseBitmapParallel(wallpaperWidth, wallpaperHeight)
