@@ -240,7 +240,7 @@ class MainActivity : ComponentActivity() {
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Bottom
                             ) {
-                                ClickableWebLink("https://example.org", "Source Code")
+                                ClickableWebLink("https://github.com/ImranR98/Wallstopper", "Source Code")
                             }
                         }
                     }
