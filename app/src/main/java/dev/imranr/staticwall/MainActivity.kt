@@ -91,11 +91,11 @@ class MainActivity : ComponentActivity() {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 80.dp, bottom = 16.dp),
+                                .padding(top = 32.dp, bottom = 32.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "NoisePaper", // Your title text
+                                text = "Wallstopper", // Your title text
                                 fontSize = 32.sp,      // Large font size
                                 modifier = Modifier.padding(bottom = 16.dp) // Bottom padding
                             )
