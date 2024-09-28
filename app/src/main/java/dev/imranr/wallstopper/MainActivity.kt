@@ -22,9 +22,12 @@ import androidx.compose.ui.Alignment
 import android.widget.Toast
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.sp
 
@@ -83,6 +86,7 @@ class MainActivity : ComponentActivity() {
                     var scaleFactorInput by remember { mutableStateOf(TextFieldValue(prefs.getInt("scale_factor", initScaleFactor).toString())) }
                     var tilingFactorInput by remember { mutableStateOf(TextFieldValue(prefs.getInt("tiling_factor", initTilingFactor).toString())) }
                     var maxNoiseBrightnessInput by remember { mutableStateOf(TextFieldValue(prefs.getInt("max_noise_brightness", initMaxNoiseBrightness).toString())) }
+                    var rotationSupport by remember { mutableStateOf(prefs.getBoolean("rotation_support", initRotationSupport)) }
                     Column(
                         modifier = Modifier
                             .padding(16.dp),
@@ -172,6 +176,30 @@ class MainActivity : ComponentActivity() {
                                 modifier = Modifier.fillMaxWidth(),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                             )
+                            val interactionSource = remember { MutableInteractionSource() }
+                            Row(
+                                modifier = Modifier
+                                    .clickable(
+                                        interactionSource = interactionSource,
+                                        // This is for removing ripple when Row is clicked
+                                        indication = null,
+                                        role = Role.Switch,
+                                        onClick = {
+                                            rotationSupport = !rotationSupport
+                                        }
+                                    ),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(text = "Rotation Support (Reduces Performance)")
+                                Spacer(modifier = Modifier.padding(start = 8.dp))
+                                Switch(
+                                    checked = rotationSupport,
+                                    onCheckedChange = {
+                                        rotationSupport = it
+                                    }
+                                )
+                            }
                         }
 
                         Column(
@@ -214,6 +242,7 @@ class MainActivity : ComponentActivity() {
                                             putInt("scale_factor", scaleFactor)
                                             putInt("tiling_factor", tilingFactor)
                                             putInt("max_noise_brightness", maxNoiseBrightness)
+                                            putBoolean("rotation_support", rotationSupport)
                                             apply()
                                         }
                                         Toast.makeText(

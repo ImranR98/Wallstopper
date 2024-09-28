@@ -11,6 +11,7 @@ import kotlin.random.Random
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import kotlin.math.max
 
 val initColour = Color.parseColor("#000000")
 const val initFPS = 60
@@ -18,6 +19,7 @@ const val initLoopSeconds = 4
 const val initScaleFactor = 2
 const val initMaxNoiseBrightness = 100
 const val initTilingFactor = 6
+const val initRotationSupport = false
 
 class NoiseGenerationViewModel : ViewModel() {
     private val _value = MutableLiveData<Float?>()
@@ -56,6 +58,7 @@ class MyWallpaperService : WallpaperService() {
         private var loopSeconds = prefs.getInt("loop_seconds", initLoopSeconds)
         private var scaleFactor = prefs.getInt("scale_factor", initScaleFactor)
         private var tilingFactor = prefs.getInt("tiling_factor", initTilingFactor)
+        private var rotationSupport = prefs.getBoolean("rotation_support", initRotationSupport)
         private var maxNoiseBrightness = prefs.getInt("max_noise_brightness", initMaxNoiseBrightness)
         private var noiseFrames = arrayOfNulls<Bitmap>(loopSeconds * fps)
 
@@ -124,6 +127,9 @@ class MyWallpaperService : WallpaperService() {
                     "max_noise_brightness" -> {
                         maxNoiseBrightness = sharedPreferences.getInt("max_noise_brightness", 256)
                     }
+                    "rotation_support" -> {
+                        rotationSupport = sharedPreferences.getBoolean("rotation_support", false)
+                    }
                 }
             }
             if (restart) {
@@ -178,8 +184,12 @@ class MyWallpaperService : WallpaperService() {
         }
 
         private fun generateNoiseFrames() {
-            val wallpaperTileWidth = wallpaperWidth / (tilingFactor * scaleFactor)
-            val wallpaperTileHeight = wallpaperHeight / (tilingFactor * scaleFactor)
+            var wallpaperTileWidth = wallpaperWidth / (tilingFactor * scaleFactor)
+            var wallpaperTileHeight = wallpaperHeight / (tilingFactor * scaleFactor)
+            if (rotationSupport) {
+                wallpaperTileWidth =  max(wallpaperTileWidth, wallpaperTileHeight)
+                wallpaperTileHeight = max(wallpaperTileWidth, wallpaperTileHeight)
+            }
             frameGenerationJob?.cancel()
             frameGenerationJob = CoroutineScope(Dispatchers.Default).launch {
                 for (i in noiseFrames.indices) {
@@ -192,7 +202,7 @@ class MyWallpaperService : WallpaperService() {
 
         private fun tileBitmap(originalBitmap: Bitmap, multiplier: Int): Bitmap? {
             // Calculate the size of the new bitmap
-            val newWidth = originalBitmap.width * multiplier
+            var newWidth = originalBitmap.width * multiplier
             val newHeight = originalBitmap.height * multiplier
 
             // Create a new bitmap with the calculated size
@@ -219,18 +229,6 @@ class MyWallpaperService : WallpaperService() {
             var canvas: Canvas? = null
             try {
                 canvas = holder.lockCanvas()
-
-                if (canvas != null) {
-                    // Draw the background color
-                    canvas.drawColor(backgroundColor)
-
-                    // Overlay the current noise frame if it exists
-                    if (currentFrameIndex < noiseFrames.size) {
-                        noiseFrames[currentFrameIndex]?.let {
-
-                        }
-                    }
-                }
 
                 if (canvas != null) {
                     // Draw the background color
