@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 class MainActivity : ComponentActivity() {
+    @OptIn(ExperimentalStdlibApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -45,9 +46,9 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    var colorText by remember { mutableStateOf(TextFieldValue("070707")) } // Default blue without the `#`
+                    var colorText by remember { mutableStateOf(TextFieldValue((initColour.toHexString(format = HexFormat.UpperCase)).substring(2))) }
                     var isValidColor by remember { mutableStateOf(true) }
-                    var currentColor by remember { mutableStateOf(Color.Black) }
+                    var currentColor by remember { mutableStateOf(Color(initColour)) }
 
                     // Function to validate the color input
                     fun isValidHexColor(input: String): Boolean {
@@ -94,7 +95,7 @@ class MainActivity : ComponentActivity() {
                                     android.graphics.Color.parseColor(colorString)
                                 } catch (e: IllegalArgumentException) {
                                     print(e);
-                                    android.graphics.Color.BLUE // Fallback color
+                                    initColour // Fallback color
                                 }
 
                                 // Save the selected color in SharedPreferences

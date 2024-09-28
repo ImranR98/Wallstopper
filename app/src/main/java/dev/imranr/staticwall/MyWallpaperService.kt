@@ -9,6 +9,8 @@ import android.content.SharedPreferences
 import kotlinx.coroutines.*
 import kotlin.random.Random
 
+val initColour = android.graphics.Color.parseColor("#FF0000")
+
 class MyWallpaperService : WallpaperService() {
 
     override fun onCreateEngine(): Engine {
@@ -16,14 +18,11 @@ class MyWallpaperService : WallpaperService() {
     }
 
     inner class MyWallpaperEngine : Engine(), SharedPreferences.OnSharedPreferenceChangeListener {
-        private val paint = Paint().apply {
-            color = android.graphics.Color.parseColor("#070707") // Default to blue
-        }
         private val noisePaint = Paint()
         private val handler = Handler(Looper.getMainLooper())
         private var visible = true
         private val prefs = getSharedPreferences("wallpaper_prefs", MODE_PRIVATE)
-        private var backgroundColor = android.graphics.Color.parseColor("#070707")
+        private var backgroundColor = initColour
         private var noiseBitmap: Bitmap? = null
 
         // Lower resolution scale factor (e.g., quarter the resolution)
@@ -66,7 +65,7 @@ class MyWallpaperService : WallpaperService() {
 
         override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
             if (key == "wallpaper_color" && sharedPreferences != null) {
-                val newColor = sharedPreferences.getInt("wallpaper_color", android.graphics.Color.BLUE)
+                val newColor = sharedPreferences.getInt("wallpaper_color", initColour)
                 updateColor(newColor)
             }
         }
@@ -109,7 +108,7 @@ class MyWallpaperService : WallpaperService() {
             val chunkSize = pixels.size / Runtime.getRuntime().availableProcessors()
             val jobs = mutableListOf<Job>()
 
-            for (i in 0 until pixels.size step chunkSize) {
+            for (i in pixels.indices step chunkSize) {
                 val end = minOf(i + chunkSize, pixels.size)
                 jobs.add(coroutineScope.launch {
                     for (j in i until end) {
