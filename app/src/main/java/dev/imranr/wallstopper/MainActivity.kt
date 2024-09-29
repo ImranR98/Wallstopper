@@ -16,6 +16,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.foundation.layout.*
 import androidx.compose.ui.unit.dp
 import android.graphics.Color
+import android.graphics.PorterDuff
 import androidx.compose.material3.*
 import androidx.compose.ui.Alignment
 import android.widget.Toast
@@ -28,6 +29,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.toLowerCase
 import androidx.compose.ui.unit.sp
 
 class MainActivity : ComponentActivity() {
@@ -35,7 +37,7 @@ class MainActivity : ComponentActivity() {
         NoiseGenerationViewModel.getInstance() // Get the shared instance
     }
 
-    @OptIn(ExperimentalStdlibApi::class)
+    @OptIn(ExperimentalStdlibApi::class, ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -90,6 +92,7 @@ class MainActivity : ComponentActivity() {
                     var minNoiseBrightnessInput by remember { mutableStateOf(TextFieldValue(prefs.getInt("min_noise_brightness", initMinNoiseBrightness).toString())) }
                     var maxNoiseBrightnessInput by remember { mutableStateOf(TextFieldValue(prefs.getInt("max_noise_brightness", initMaxNoiseBrightness).toString())) }
                     var rotationSupport by remember { mutableStateOf(prefs.getBoolean("rotation_support", initRotationSupport)) }
+                    var blendModeInput by remember { mutableStateOf(prefs.getString("blend_mode", initBlendMode)) }
                     Column(
                         modifier = Modifier
                             .padding(16.dp),
@@ -258,6 +261,33 @@ class MainActivity : ComponentActivity() {
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                                 )
                             }
+                            val blendModes = PorterDuff.Mode.entries
+                            var blendModeDropdownExpanded by remember { mutableStateOf(false) }
+                            Button(
+                                onClick = { blendModeDropdownExpanded = !blendModeDropdownExpanded },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.secondary
+                                ),
+                            ) {
+                                Text(text = "Change Blend Mode (${blendModeInput})")
+                            }
+                            // Dropdown menu
+                            DropdownMenu(
+                                expanded = blendModeDropdownExpanded,
+                                onDismissRequest = { blendModeDropdownExpanded = false },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                blendModes.forEach { mode ->
+                                    DropdownMenuItem(
+                                        text = { Text(mode.name) },
+                                        onClick = {
+                                            blendModeInput = mode.name
+                                            blendModeDropdownExpanded = false // Close the dropdown after selection
+                                        }
+                                    )
+                                }
+                            }
                             val interactionSource = remember { MutableInteractionSource() }
                             Row(
                                 modifier = Modifier
@@ -348,6 +378,7 @@ class MainActivity : ComponentActivity() {
                                                 putInt("min_noise_brightness", minNoiseBrightness)
                                                 putInt("max_noise_brightness", maxNoiseBrightness)
                                                 putBoolean("rotation_support", rotationSupport)
+                                                putString("blend_mode", blendModeInput)
                                                 apply()
                                             }
                                             Toast.makeText(

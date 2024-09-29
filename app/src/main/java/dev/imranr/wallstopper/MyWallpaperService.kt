@@ -24,7 +24,8 @@ const val initLoopSeconds = 3
 const val initScaleFactor = 2
 const val initTilingFactor = 2
 const val initMinNoiseBrightness = 1
-const val initMaxNoiseBrightness = 128
+const val initMaxNoiseBrightness = 23
+var initBlendMode = PorterDuff.Mode.SCREEN.name
 const val initRotationSupport = false
 
 class NoiseGenerationViewModel : ViewModel() {
@@ -73,11 +74,11 @@ class MyWallpaperService : WallpaperService() {
         private var rotationSupport = prefs.getBoolean("rotation_support", initRotationSupport)
         private var minNoiseBrightness = prefs.getInt("min_noise_brightness", initMinNoiseBrightness)
         private var maxNoiseBrightness = prefs.getInt("max_noise_brightness", initMaxNoiseBrightness)
+        private var blendMode = prefs.getString("blend_mode", initBlendMode)
         private var noiseFrames = arrayOfNulls<Bitmap>(loopSeconds * fps)
 
         init {
             prefs.registerOnSharedPreferenceChangeListener(this)
-            noisePaint.setXfermode(PorterDuffXfermode(PorterDuff.Mode.OVERLAY))
         }
 
         private val noiseGenerationViewModel: NoiseGenerationViewModel by lazy {
@@ -166,6 +167,9 @@ class MyWallpaperService : WallpaperService() {
                     "max_noise_brightness" -> {
                         maxNoiseBrightness = sharedPreferences.getInt("max_noise_brightness", initMaxNoiseBrightness)
                     }
+                    "blend_mode" -> {
+                        blendMode = sharedPreferences.getString("blend_mode", initBlendMode)
+                    }
                     "rotation_support" -> {
                         rotationSupport = sharedPreferences.getBoolean("rotation_support", initRotationSupport)
                     }
@@ -222,7 +226,9 @@ class MyWallpaperService : WallpaperService() {
             return noiseBitmap
         }
 
+        @OptIn(ExperimentalStdlibApi::class)
         private fun generateNoiseFrames() {
+            noisePaint.setXfermode(PorterDuffXfermode(PorterDuff.Mode.entries.find { it.name == blendMode }))
             var wallpaperTileWidth = wallpaperWidth / (tilingFactor * scaleFactor)
             var wallpaperTileHeight = wallpaperHeight / (tilingFactor * scaleFactor)
             if (rotationSupport) {
@@ -294,11 +300,9 @@ class MyWallpaperService : WallpaperService() {
             var canvas: Canvas? = null
             try {
                 canvas = holder.lockCanvas()
-
                 if (canvas != null) {
                     // Draw the background gradient
                     drawGradientBackground(canvas, if (rotationSupport) wallpaperLength else wallpaperWidth , if (rotationSupport) wallpaperLength else wallpaperHeight, backgroundColor, backgroundSecondaryColor, startXPct.toFloat(), startYPct.toFloat(), endXPct.toFloat(), endYPct.toFloat())
-
                     // Overlay the current noise frame if it exists
                     if (currentFrameIndex < noiseFrames.size) {
                         noiseFrames[currentFrameIndex]?.let {
