@@ -23,7 +23,8 @@ const val initFPS = 60
 const val initLoopSeconds = 3
 const val initScaleFactor = 2
 const val initTilingFactor = 2
-const val initMaxNoiseBrightness = 24
+const val initMinNoiseBrightness = 1
+const val initMaxNoiseBrightness = 128
 const val initRotationSupport = false
 
 class NoiseGenerationViewModel : ViewModel() {
@@ -70,12 +71,13 @@ class MyWallpaperService : WallpaperService() {
         private var scaleFactor = prefs.getInt("scale_factor", initScaleFactor)
         private var tilingFactor = prefs.getInt("tiling_factor", initTilingFactor)
         private var rotationSupport = prefs.getBoolean("rotation_support", initRotationSupport)
+        private var minNoiseBrightness = prefs.getInt("min_noise_brightness", initMinNoiseBrightness)
         private var maxNoiseBrightness = prefs.getInt("max_noise_brightness", initMaxNoiseBrightness)
         private var noiseFrames = arrayOfNulls<Bitmap>(loopSeconds * fps)
 
         init {
             prefs.registerOnSharedPreferenceChangeListener(this)
-            noisePaint.setXfermode(PorterDuffXfermode(PorterDuff.Mode.SCREEN))
+            noisePaint.setXfermode(PorterDuffXfermode(PorterDuff.Mode.OVERLAY))
         }
 
         private val noiseGenerationViewModel: NoiseGenerationViewModel by lazy {
@@ -158,6 +160,9 @@ class MyWallpaperService : WallpaperService() {
                     "tiling_factor" -> {
                         tilingFactor = sharedPreferences.getInt("tiling_factor", initTilingFactor)
                     }
+                    "min_noise_brightness" -> {
+                        minNoiseBrightness = sharedPreferences.getInt("min_noise_brightness", initMinNoiseBrightness)
+                    }
                     "max_noise_brightness" -> {
                         maxNoiseBrightness = sharedPreferences.getInt("max_noise_brightness", initMaxNoiseBrightness)
                     }
@@ -207,7 +212,7 @@ class MyWallpaperService : WallpaperService() {
                 jobs.add(coroutineScope.launch {
                     for (j in i until end) {
                         // Generate random grayscale noise and make it semi-transparent
-                        val noise = Random.nextInt(0, maxNoiseBrightness)
+                        val noise = Random.nextInt(minNoiseBrightness, maxNoiseBrightness)
                         pixels[j] = Color.argb(255, noise, noise, noise) // Alpha = 50 for transparency
                     }
                 })

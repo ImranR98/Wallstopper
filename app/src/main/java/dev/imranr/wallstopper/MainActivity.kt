@@ -87,6 +87,7 @@ class MainActivity : ComponentActivity() {
                     var loopSecondsInput by remember { mutableStateOf(TextFieldValue(prefs.getInt("loop_seconds", initLoopSeconds).toString())) }
                     var scaleFactorInput by remember { mutableStateOf(TextFieldValue(prefs.getInt("scale_factor", initScaleFactor).toString())) }
                     var tilingFactorInput by remember { mutableStateOf(TextFieldValue(prefs.getInt("tiling_factor", initTilingFactor).toString())) }
+                    var minNoiseBrightnessInput by remember { mutableStateOf(TextFieldValue(prefs.getInt("min_noise_brightness", initMinNoiseBrightness).toString())) }
                     var maxNoiseBrightnessInput by remember { mutableStateOf(TextFieldValue(prefs.getInt("max_noise_brightness", initMaxNoiseBrightness).toString())) }
                     var rotationSupport by remember { mutableStateOf(prefs.getBoolean("rotation_support", initRotationSupport)) }
                     Column(
@@ -230,17 +231,33 @@ class MainActivity : ComponentActivity() {
                                 modifier = Modifier.fillMaxWidth(),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                             )
-                            TextField(
-                                value = maxNoiseBrightnessInput,
-                                onValueChange = {
-                                    if (it.text.isEmpty() || it.text.matches(Regex("[0-9]+")) && it.text.toInt() >= 1 && it.text.toInt() <= 256) {
-                                        maxNoiseBrightnessInput = it
-                                    }
-                                },
-                                label = { Text("Max Noise Brightness (1-256)") },
+                            Row (
                                 modifier = Modifier.fillMaxWidth(),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                            )
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                TextField(
+                                    value = minNoiseBrightnessInput,
+                                    onValueChange = {
+                                        if (it.text.isEmpty() || it.text.matches(Regex("[0-9]+")) && it.text.toInt() >= 1 && it.text.toInt() <= 256) {
+                                            minNoiseBrightnessInput = it
+                                        }
+                                    },
+                                    label = { Text("Min Noise Brightness (1-256)") },
+                                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                                )
+                                TextField(
+                                    value = maxNoiseBrightnessInput,
+                                    onValueChange = {
+                                        if (it.text.isEmpty() || it.text.matches(Regex("[0-9]+")) && it.text.toInt() >= 1 && it.text.toInt() <= 256) {
+                                            maxNoiseBrightnessInput = it
+                                        }
+                                    },
+                                    label = { Text("Max Noise Brightness (1-256)") },
+                                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                                )
+                            }
                             val interactionSource = remember { MutableInteractionSource() }
                             Row(
                                 modifier = Modifier
@@ -299,7 +316,13 @@ class MainActivity : ComponentActivity() {
                                                 maxNoiseBrightnessInput.text.toIntOrNull()
                                                     ?.coerceIn(1, 256)
                                                     ?: initMaxNoiseBrightness
-
+                                            val minNoiseBrightness =
+                                                minNoiseBrightnessInput.text.toIntOrNull()
+                                                    ?.coerceIn(1, 256)
+                                                    ?: initMinNoiseBrightness
+                                            if (minNoiseBrightness > maxNoiseBrightness) {
+                                                throw Exception("Min noise brightness must be <= max.")
+                                            }
                                             val color = if (colorHex.startsWith("#")) {
                                                 Color.parseColor(colorHex)
                                             } else {
@@ -322,6 +345,7 @@ class MainActivity : ComponentActivity() {
                                                 putInt("loop_seconds", loopSeconds)
                                                 putInt("scale_factor", scaleFactor)
                                                 putInt("tiling_factor", tilingFactor)
+                                                putInt("min_noise_brightness", minNoiseBrightness)
                                                 putInt("max_noise_brightness", maxNoiseBrightness)
                                                 putBoolean("rotation_support", rotationSupport)
                                                 apply()
@@ -337,7 +361,7 @@ class MainActivity : ComponentActivity() {
                                                 "Invalid input.",
                                                 Toast.LENGTH_SHORT
                                             ).show()
-                                            throw e
+                                            print(e.stackTraceToString())
                                         }
                                     },
                                 ) {
