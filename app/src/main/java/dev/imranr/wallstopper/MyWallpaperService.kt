@@ -14,6 +14,11 @@ import androidx.lifecycle.ViewModel
 import kotlin.math.max
 
 val initColour = Color.parseColor("#000000")
+val initSecondaryColour = Color.parseColor("#333333")
+const val initStartX = 0
+const val initStartY = 60
+const val initEndX = 0
+const val initEndY = 100
 const val initFPS = 60
 const val initLoopSeconds = 4
 const val initScaleFactor = 2
@@ -50,10 +55,16 @@ class MyWallpaperService : WallpaperService() {
         private val prefs = getSharedPreferences("wallpaper_prefs", MODE_PRIVATE)
         private var wallpaperWidth: Int = 0
         private var wallpaperHeight: Int = 0
+        private var wallpaperLength: Int = 0
         private val coroutineScope = CoroutineScope(Dispatchers.Default + Job())
         private var currentFrameIndex = 0
         private var frameGenerationJob: Job? = null
         private var backgroundColor = prefs.getInt("wallpaper_color", initColour)
+        private var backgroundSecondaryColor = prefs.getInt("wallpaper_color_2", initSecondaryColour)
+        private var startXPct = prefs.getInt("start_x_pct", initStartX)
+        private var startYPct = prefs.getInt("start_y_pct", initStartY)
+        private var endXPct = prefs.getInt("end_x_pct", initEndX)
+        private var endYPct = prefs.getInt("end_y_pct", initEndY)
         private var fps = prefs.getInt("fps", initFPS)
         private var loopSeconds = prefs.getInt("loop_seconds", initLoopSeconds)
         private var scaleFactor = prefs.getInt("scale_factor", initScaleFactor)
@@ -84,6 +95,7 @@ class MyWallpaperService : WallpaperService() {
             super.onSurfaceCreated(holder)
             wallpaperWidth = holder.surfaceFrame.width()
             wallpaperHeight = holder.surfaceFrame.height()
+            wallpaperLength =  max(wallpaperWidth, wallpaperHeight)
             generateNoiseFrames()
             draw()
             handler.post(animationRunnable) // Start animation loop
@@ -105,6 +117,7 @@ class MyWallpaperService : WallpaperService() {
         }
 
         override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
+            noiseGenerationViewModel.updateValue(null)
             var restart = true
             if (sharedPreferences != null) {
                 when (key) {
@@ -112,23 +125,43 @@ class MyWallpaperService : WallpaperService() {
                         backgroundColor = sharedPreferences.getInt("wallpaper_color", initColour)
                         restart = false
                     }
+                    "wallpaper_color_2" -> {
+                        backgroundSecondaryColor = sharedPreferences.getInt("wallpaper_color_2", initSecondaryColour)
+                        restart = false
+                    }
+                    "start_x_pct" -> {
+                        startXPct = sharedPreferences.getInt("start_x_pct", initStartX)
+                        restart = false
+                    }
+                    "start_y_pct" -> {
+                        startYPct = sharedPreferences.getInt("start_y_pct", initStartY)
+                        restart = false
+                    }
+                    "end_x_pct" -> {
+                        endXPct = sharedPreferences.getInt("end_x_pct", initEndX)
+                        restart = false
+                    }
+                    "end_y_pct" -> {
+                        endYPct = sharedPreferences.getInt("end_y_pct", initEndY)
+                        restart = false
+                    }
                     "fps" -> {
-                        fps = sharedPreferences.getInt("fps", 24)
+                        fps = sharedPreferences.getInt("fps", initFPS)
                     }
                     "loop_seconds" -> {
-                        loopSeconds = sharedPreferences.getInt("loop_seconds", 3)
+                        loopSeconds = sharedPreferences.getInt("loop_seconds", initLoopSeconds)
                     }
                     "scale_factor" -> {
-                        scaleFactor = sharedPreferences.getInt("scale_factor", 1)
+                        scaleFactor = sharedPreferences.getInt("scale_factor", initScaleFactor)
                     }
                     "tiling_factor" -> {
-                        tilingFactor = sharedPreferences.getInt("tiling_factor", 1)
+                        tilingFactor = sharedPreferences.getInt("tiling_factor", initTilingFactor)
                     }
                     "max_noise_brightness" -> {
-                        maxNoiseBrightness = sharedPreferences.getInt("max_noise_brightness", 256)
+                        maxNoiseBrightness = sharedPreferences.getInt("max_noise_brightness", initMaxNoiseBrightness)
                     }
                     "rotation_support" -> {
-                        rotationSupport = sharedPreferences.getBoolean("rotation_support", false)
+                        rotationSupport = sharedPreferences.getBoolean("rotation_support", initRotationSupport)
                     }
                 }
             }
@@ -187,8 +220,8 @@ class MyWallpaperService : WallpaperService() {
             var wallpaperTileWidth = wallpaperWidth / (tilingFactor * scaleFactor)
             var wallpaperTileHeight = wallpaperHeight / (tilingFactor * scaleFactor)
             if (rotationSupport) {
-                wallpaperTileWidth =  max(wallpaperTileWidth, wallpaperTileHeight)
-                wallpaperTileHeight = max(wallpaperTileWidth, wallpaperTileHeight)
+                wallpaperTileWidth =  wallpaperLength / (tilingFactor * scaleFactor)
+                wallpaperTileHeight = wallpaperTileWidth
             }
             frameGenerationJob?.cancel()
             frameGenerationJob = CoroutineScope(Dispatchers.Default).launch {
@@ -202,7 +235,7 @@ class MyWallpaperService : WallpaperService() {
 
         private fun tileBitmap(originalBitmap: Bitmap, multiplier: Int): Bitmap? {
             // Calculate the size of the new bitmap
-            var newWidth = originalBitmap.width * multiplier
+            val newWidth = originalBitmap.width * multiplier
             val newHeight = originalBitmap.height * multiplier
 
             // Create a new bitmap with the calculated size
@@ -224,6 +257,32 @@ class MyWallpaperService : WallpaperService() {
             return tiledBitmap
         }
 
+        private fun drawGradientBackground(
+            canvas: Canvas,
+            width: Int,
+            height: Int,
+            startColor: Int,
+            endColor: Int,
+            startXPct: Float,
+            startYPct: Float,
+            endXPct: Float,
+            endYPct: Float
+        ) {
+            val startX = (startXPct / 100) * width
+            val startY = (startYPct / 100) * height
+            val endX = (endXPct / 100) * width
+            val endY = (endYPct / 100) * height
+            val gradient = LinearGradient(
+                startX, startY, endX, endY, // Calculated coordinates
+                startColor, endColor, // Colors for the gradient
+                Shader.TileMode.CLAMP  // No repetition outside the gradient
+            )
+            val paint = Paint()
+            paint.shader = gradient
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+        }
+
+
         private fun draw() {
             val holder = surfaceHolder
             var canvas: Canvas? = null
@@ -231,8 +290,8 @@ class MyWallpaperService : WallpaperService() {
                 canvas = holder.lockCanvas()
 
                 if (canvas != null) {
-                    // Draw the background color
-                    canvas.drawColor(backgroundColor)
+                    // Draw the background gradient
+                    drawGradientBackground(canvas, if (rotationSupport) wallpaperLength else wallpaperWidth , if (rotationSupport) wallpaperLength else wallpaperHeight, backgroundColor, backgroundSecondaryColor, startXPct.toFloat(), startYPct.toFloat(), endXPct.toFloat(), endYPct.toFloat())
 
                     // Overlay the current noise frame if it exists
                     if (currentFrameIndex < noiseFrames.size) {
