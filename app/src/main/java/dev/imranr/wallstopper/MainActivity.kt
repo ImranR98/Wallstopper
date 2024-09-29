@@ -378,6 +378,11 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onResume() {
+        super.onResume()
+        noiseGenerationViewModel.updateValue(null)
+    }
 }
 
 @Composable

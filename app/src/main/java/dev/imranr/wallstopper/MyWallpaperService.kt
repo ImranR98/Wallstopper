@@ -13,17 +13,17 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import kotlin.math.max
 
-val initColour = Color.parseColor("#000000")
-val initSecondaryColour = Color.parseColor("#333333")
+val initColour = Color.parseColor("#1D0130")
+val initSecondaryColour = Color.parseColor("#FC056C")
 const val initStartX = 0
 const val initStartY = 60
-const val initEndX = 0
+const val initEndX = 50
 const val initEndY = 100
 const val initFPS = 60
-const val initLoopSeconds = 4
+const val initLoopSeconds = 3
 const val initScaleFactor = 2
+const val initTilingFactor = 2
 const val initMaxNoiseBrightness = 100
-const val initTilingFactor = 6
 const val initRotationSupport = false
 
 class NoiseGenerationViewModel : ViewModel() {
