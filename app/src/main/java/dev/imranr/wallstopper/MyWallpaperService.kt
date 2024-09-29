@@ -6,6 +6,7 @@ import android.os.Looper
 import android.service.wallpaper.WallpaperService
 import android.view.SurfaceHolder
 import android.content.SharedPreferences
+import android.util.Log
 import kotlinx.coroutines.*
 import kotlin.random.Random
 import androidx.lifecycle.LiveData
@@ -50,6 +51,7 @@ class MyWallpaperService : WallpaperService() {
         return MyWallpaperEngine()
     }
 
+    @OptIn(ExperimentalStdlibApi::class)
     inner class MyWallpaperEngine : Engine(), SharedPreferences.OnSharedPreferenceChangeListener {
         private val noisePaint = Paint()
         private val handler = Handler(Looper.getMainLooper())
@@ -74,24 +76,26 @@ class MyWallpaperService : WallpaperService() {
         private var rotationSupport = prefs.getBoolean("rotation_support", initRotationSupport)
         private var minNoiseBrightness = prefs.getInt("min_noise_brightness", initMinNoiseBrightness)
         private var maxNoiseBrightness = prefs.getInt("max_noise_brightness", initMaxNoiseBrightness)
+        private var gradientPaint = Paint()
         private var blendMode = prefs.getString("blend_mode", initBlendMode)
         private var noiseFrames = arrayOfNulls<Bitmap>(loopSeconds * fps)
 
         init {
             prefs.registerOnSharedPreferenceChangeListener(this)
+            noisePaint.setXfermode(PorterDuffXfermode(PorterDuff.Mode.entries.find { it.name == blendMode }))
         }
 
         private val noiseGenerationViewModel: NoiseGenerationViewModel by lazy {
-            NoiseGenerationViewModel.getInstance() // Get the shared instance
+            NoiseGenerationViewModel.getInstance()
         }
 
         override fun onVisibilityChanged(visible: Boolean) {
             this.visible = visible
             if (visible) {
                 draw()
-                handler.post(animationRunnable) // Start animation when visible
+                handler.post(animationRunnable)
             } else {
-                handler.removeCallbacks(animationRunnable) // Stop animation when invisible
+                handler.removeCallbacks(animationRunnable)
             }
         }
 
@@ -100,124 +104,123 @@ class MyWallpaperService : WallpaperService() {
             wallpaperWidth = holder.surfaceFrame.width()
             wallpaperHeight = holder.surfaceFrame.height()
             wallpaperLength =  max(wallpaperWidth, wallpaperHeight)
+            generateGradient()
             generateNoiseFrames()
             draw()
-            handler.post(animationRunnable) // Start animation loop
+            handler.post(animationRunnable)
         }
 
         override fun onSurfaceDestroyed(holder: SurfaceHolder) {
             super.onSurfaceDestroyed(holder)
-            handler.removeCallbacks(animationRunnable) // Stop the animation
+            handler.removeCallbacks(animationRunnable)
             visible = false
         }
 
         override fun onDestroy() {
             super.onDestroy()
             prefs.unregisterOnSharedPreferenceChangeListener(this)
-            frameGenerationJob?.cancel() // Cancel frame generation job if active
+            frameGenerationJob?.cancel()
             noiseFrames.forEach {
                 it?.recycle()
-            } // Clean up generated bitmaps
+            }
         }
 
+        @OptIn(ExperimentalStdlibApi::class)
         override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
             noiseGenerationViewModel.updateValue(null)
-            var restart = true
+            var regenerateNoise = false
+            var regenerateGradient = false
             if (sharedPreferences != null) {
                 when (key) {
                     "wallpaper_color" -> {
                         backgroundColor = sharedPreferences.getInt("wallpaper_color", initColour)
-                        restart = false
+                        regenerateGradient = true
                     }
                     "wallpaper_color_2" -> {
                         backgroundSecondaryColor = sharedPreferences.getInt("wallpaper_color_2", initSecondaryColour)
-                        restart = false
+                        regenerateGradient = true
                     }
                     "start_x_pct" -> {
                         startXPct = sharedPreferences.getInt("start_x_pct", initStartX)
-                        restart = false
+                        regenerateGradient = true
                     }
                     "start_y_pct" -> {
                         startYPct = sharedPreferences.getInt("start_y_pct", initStartY)
-                        restart = false
+                        regenerateGradient = true
                     }
                     "end_x_pct" -> {
                         endXPct = sharedPreferences.getInt("end_x_pct", initEndX)
-                        restart = false
+                        regenerateGradient = true
                     }
                     "end_y_pct" -> {
                         endYPct = sharedPreferences.getInt("end_y_pct", initEndY)
-                        restart = false
+                        regenerateGradient = true
                     }
                     "fps" -> {
                         fps = sharedPreferences.getInt("fps", initFPS)
+                        regenerateNoise = true
                     }
                     "loop_seconds" -> {
                         loopSeconds = sharedPreferences.getInt("loop_seconds", initLoopSeconds)
+                        regenerateNoise = true
                     }
                     "scale_factor" -> {
                         scaleFactor = sharedPreferences.getInt("scale_factor", initScaleFactor)
+                        regenerateNoise = true
                     }
                     "tiling_factor" -> {
                         tilingFactor = sharedPreferences.getInt("tiling_factor", initTilingFactor)
+                        regenerateNoise = true
                     }
                     "min_noise_brightness" -> {
                         minNoiseBrightness = sharedPreferences.getInt("min_noise_brightness", initMinNoiseBrightness)
+                        regenerateNoise = true
                     }
                     "max_noise_brightness" -> {
                         maxNoiseBrightness = sharedPreferences.getInt("max_noise_brightness", initMaxNoiseBrightness)
+                        regenerateNoise = true
                     }
                     "blend_mode" -> {
                         blendMode = sharedPreferences.getString("blend_mode", initBlendMode)
+                        noisePaint.setXfermode(PorterDuffXfermode(PorterDuff.Mode.entries.find { it.name == blendMode }))
                     }
                     "rotation_support" -> {
                         rotationSupport = sharedPreferences.getBoolean("rotation_support", initRotationSupport)
+                        regenerateNoise = true
                     }
                 }
             }
-            if (restart) {
-                noiseFrames = arrayOfNulls(loopSeconds * fps)
-                for (i in noiseFrames.indices) {
-                    noiseFrames[i] = null
-                }
-                generateNoiseFrames()
+            if (regenerateGradient) {
+                generateGradient()
             }
-            if (visible) {
-                draw()
+            if (regenerateNoise) {
+                noiseFrames = arrayOfNulls(loopSeconds * fps)
+                generateNoiseFrames()
             }
         }
 
-        // Animation runnable to update the current frame
         private val animationRunnable = object : Runnable {
             override fun run() {
                 if (visible && noiseFrames.isNotEmpty()) {
-                    draw() // Draw the current frame
+                    draw()
                     val nextFrameIndex = (currentFrameIndex + 1) % noiseFrames.size
-                    currentFrameIndex = if (noiseFrames[nextFrameIndex] != null) {
-                        nextFrameIndex // Loop back to the start
-                    } else {
-                        0
-                    }
-                    handler.postDelayed(this, 1000L / fps) // Schedule the next frame
+                    currentFrameIndex = if (noiseFrames[nextFrameIndex] != null)  nextFrameIndex else 0
+                    handler.postDelayed(this, 1000L / fps)
                 }
             }
         }
 
-        // Parallel noise generation using Kotlin coroutines at a lower resolution
-        private suspend fun generateNoiseBitmapParallel(width: Int, height: Int): Bitmap {
-            // Only create a new bitmap if the size changes
+        private suspend fun generateNoiseBitmap(width: Int, height: Int): Bitmap {
             val noiseBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             val pixels = IntArray(width * height)
-            // Split the work into parallel coroutines to fill the pixels array
             val chunkSize = pixels.size / Runtime.getRuntime().availableProcessors()
             val jobs = mutableListOf<Job>()
             for (i in pixels.indices step chunkSize) {
                 val end = minOf(i + chunkSize, pixels.size)
                 jobs.add(coroutineScope.launch {
                     for (j in i until end) {
-                        // Generate random grayscale noise and make it semi-transparent
                         val noise = Random.nextInt(minNoiseBrightness, maxNoiseBrightness)
-                        pixels[j] = Color.argb(255, noise, noise, noise) // Alpha = 50 for transparency
+                        pixels[j] = Color.argb(255, noise, noise, noise)
                     }
                 })
             }
@@ -226,9 +229,40 @@ class MyWallpaperService : WallpaperService() {
             return noiseBitmap
         }
 
+        private fun tileBitmap(originalBitmap: Bitmap, multiplier: Int): Bitmap {
+            val newWidth = originalBitmap.width * multiplier
+            val newHeight = originalBitmap.height * multiplier
+            val tiledBitmap =
+                originalBitmap.config.let { Bitmap.createBitmap(newWidth, newHeight, it!!) }
+            val paint = Paint()
+            for (x in 0 until multiplier) {
+                for (y in 0 until multiplier) {
+                    val left = x * originalBitmap.width
+                    val top = y * originalBitmap.height
+                    Canvas(tiledBitmap)
+                        .drawBitmap(originalBitmap, left.toFloat(), top.toFloat(), paint)
+                }
+            }
+            return tiledBitmap
+        }
+
+        private fun generateGradient() {
+            val width = if (rotationSupport) wallpaperLength else wallpaperWidth
+            val height = if (rotationSupport) wallpaperLength else wallpaperHeight
+            val startX = (startXPct / 100F) * width
+            val startY = (startYPct / 100F) * height
+            val endX = (endXPct / 100F) * width
+            val endY = (endYPct / 100F) * height
+            val gradient = LinearGradient(
+                startX, startY, endX, endY,
+                backgroundColor, backgroundSecondaryColor,
+                Shader.TileMode.CLAMP
+            )
+            gradientPaint.shader = gradient
+        }
+
         @OptIn(ExperimentalStdlibApi::class)
         private fun generateNoiseFrames() {
-            noisePaint.setXfermode(PorterDuffXfermode(PorterDuff.Mode.entries.find { it.name == blendMode }))
             var wallpaperTileWidth = wallpaperWidth / (tilingFactor * scaleFactor)
             var wallpaperTileHeight = wallpaperHeight / (tilingFactor * scaleFactor)
             if (rotationSupport) {
@@ -238,88 +272,47 @@ class MyWallpaperService : WallpaperService() {
             frameGenerationJob?.cancel()
             frameGenerationJob = CoroutineScope(Dispatchers.Default).launch {
                 for (i in noiseFrames.indices) {
-                    noiseFrames[i] = generateNoiseBitmapParallel(wallpaperTileWidth, wallpaperTileHeight)
+                    var noiseFrame = generateNoiseBitmap(wallpaperTileWidth, wallpaperTileHeight)
+                    if (tilingFactor > 1) {
+                        noiseFrame = tileBitmap(noiseFrame, tilingFactor)
+                    }
+                    if (scaleFactor > 1) {
+                        val scalingMatrix = Matrix().apply {
+                            postScale(scaleFactor.toFloat(), scaleFactor.toFloat())
+                        }
+                        noiseFrame = Bitmap.createBitmap(
+                            noiseFrame,
+                            0,
+                            0,
+                            noiseFrame.width,
+                            noiseFrame.height,
+                            scalingMatrix,
+                            false
+                        )
+                    }
+                    noiseFrames[i] = noiseFrame
                     noiseGenerationViewModel.updateValue((i.toFloat() / noiseFrames.size))
                 }
                 noiseGenerationViewModel.updateValue(null)
             }
         }
 
-        private fun tileBitmap(originalBitmap: Bitmap, multiplier: Int): Bitmap? {
-            // Calculate the size of the new bitmap
-            val newWidth = originalBitmap.width * multiplier
-            val newHeight = originalBitmap.height * multiplier
-
-            // Create a new bitmap with the calculated size
-            val tiledBitmap =
-                originalBitmap.config?.let { Bitmap.createBitmap(newWidth, newHeight, it) }
-            val paint = Paint()
-
-            // Draw the original bitmap in a grid based on the scale factor
-            for (x in 0 until multiplier) {
-                for (y in 0 until multiplier) {
-                    // Calculate the position for each tile
-                    val left = x * originalBitmap.width
-                    val top = y * originalBitmap.height
-                    tiledBitmap?.let { Canvas(it) }
-                        ?.drawBitmap(originalBitmap, left.toFloat(), top.toFloat(), paint)
-                }
-            }
-
-            return tiledBitmap
-        }
-
-        private fun drawGradientBackground(
-            canvas: Canvas,
-            width: Int,
-            height: Int,
-            startColor: Int,
-            endColor: Int,
-            startXPct: Float,
-            startYPct: Float,
-            endXPct: Float,
-            endYPct: Float
-        ) {
-            val startX = (startXPct / 100) * width
-            val startY = (startYPct / 100) * height
-            val endX = (endXPct / 100) * width
-            val endY = (endYPct / 100) * height
-            val gradient = LinearGradient(
-                startX, startY, endX, endY, // Calculated coordinates
-                startColor, endColor, // Colors for the gradient
-                Shader.TileMode.CLAMP  // No repetition outside the gradient
-            )
-            val paint = Paint()
-            paint.shader = gradient
-            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
-        }
-
-
         private fun draw() {
             val holder = surfaceHolder
-            var canvas: Canvas? = null
-            try {
-                canvas = holder.lockCanvas()
-                if (canvas != null) {
-                    // Draw the background gradient
-                    drawGradientBackground(canvas, if (rotationSupport) wallpaperLength else wallpaperWidth , if (rotationSupport) wallpaperLength else wallpaperHeight, backgroundColor, backgroundSecondaryColor, startXPct.toFloat(), startYPct.toFloat(), endXPct.toFloat(), endYPct.toFloat())
-                    // Overlay the current noise frame if it exists
-                    if (currentFrameIndex < noiseFrames.size) {
-                        noiseFrames[currentFrameIndex]?.let {
-                            val noiseBitmap = tileBitmap(it, tilingFactor)
-                            if (noiseBitmap != null) {
-                                val matrix = Matrix().apply {
-                                    postScale(scaleFactor.toFloat(), scaleFactor.toFloat())
-                                }
-                                val scaledNoiseBitmap = Bitmap.createBitmap(noiseBitmap, 0, 0, noiseBitmap.width, noiseBitmap.height, matrix, false)
-                                canvas.drawBitmap(scaledNoiseBitmap, 0f, 0f, noisePaint)
-                            }
-                        }
+            val canvas: Canvas? = holder.lockCanvas()
+            if (canvas != null) {
+                try {
+                    noiseFrames[currentFrameIndex]?.let {
+                        canvas.drawRect(
+                            0f,
+                            0f,
+                            wallpaperWidth.toFloat(),
+                            wallpaperHeight.toFloat(),
+                            gradientPaint
+                        )
+                        canvas.drawBitmap(it, 0f, 0f, noisePaint)
                     }
-                }
-
-            } finally {
-                if (canvas != null) {
+                } finally {
                     holder.unlockCanvasAndPost(canvas)
                 }
             }

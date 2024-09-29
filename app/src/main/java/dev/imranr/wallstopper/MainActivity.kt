@@ -29,12 +29,11 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.toLowerCase
 import androidx.compose.ui.unit.sp
 
 class MainActivity : ComponentActivity() {
     private val noiseGenerationViewModel: NoiseGenerationViewModel by lazy {
-        NoiseGenerationViewModel.getInstance() // Get the shared instance
+        NoiseGenerationViewModel.getInstance()
     }
 
     @OptIn(ExperimentalStdlibApi::class, ExperimentalMaterial3Api::class)
@@ -69,7 +68,6 @@ class MainActivity : ComponentActivity() {
             }
             var frameGenerationProgress by remember { mutableStateOf<Float?>(null) }
 
-            // Observe LiveData from SharedViewModel
             noiseGenerationViewModel.value.observe(this) { newMessage ->
                 frameGenerationProgress = newMessage
             }
@@ -106,8 +104,8 @@ class MainActivity : ComponentActivity() {
                         ) {
                             StatusBarSpacer()
                             Text(
-                                text = "Wallstopper", // Your title text
-                                fontSize = 32.sp,      // Large font size
+                                text = "Wallstopper",
+                                fontSize = 32.sp,
                             )
                         }
                         Column(
@@ -267,12 +265,12 @@ class MainActivity : ComponentActivity() {
                                 onClick = { blendModeDropdownExpanded = !blendModeDropdownExpanded },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.secondary
+                                    containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                                    contentColor = MaterialTheme.colorScheme.primary
                                 ),
                             ) {
                                 Text(text = "Change Blend Mode (${blendModeInput})")
                             }
-                            // Dropdown menu
                             DropdownMenu(
                                 expanded = blendModeDropdownExpanded,
                                 onDismissRequest = { blendModeDropdownExpanded = false },
@@ -283,7 +281,7 @@ class MainActivity : ComponentActivity() {
                                         text = { Text(mode.name) },
                                         onClick = {
                                             blendModeInput = mode.name
-                                            blendModeDropdownExpanded = false // Close the dropdown after selection
+                                            blendModeDropdownExpanded = false
                                         }
                                     )
                                 }
@@ -293,7 +291,6 @@ class MainActivity : ComponentActivity() {
                                 modifier = Modifier
                                     .clickable(
                                         interactionSource = interactionSource,
-                                        // This is for removing ripple when Row is clicked
                                         indication = null,
                                         role = Role.Switch,
                                         onClick = {
@@ -312,15 +309,13 @@ class MainActivity : ComponentActivity() {
                                     }
                                 )
                             }
-                            Column(
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 Button(
                                     onClick = {
                                         try {
-                                            // Validate and save inputs
                                             val colorHex = colorInput.text
                                             val colorHex2 = colorInput2.text
                                             val startXPct =
@@ -395,12 +390,14 @@ class MainActivity : ComponentActivity() {
                                             print(e.stackTraceToString())
                                         }
                                     },
+                                    modifier = Modifier.weight(1f)
                                 ) {
                                     Text("Update Wallpaper Settings")
                                 }
+                                Spacer(modifier = Modifier.padding(start = 8.dp))
                                 Button(
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.secondary // Set the background color to secondary color
+                                        containerColor = MaterialTheme.colorScheme.secondary
                                     ),
                                     onClick = {
                                         val intent = Intent(Intent.ACTION_SET_WALLPAPER)
