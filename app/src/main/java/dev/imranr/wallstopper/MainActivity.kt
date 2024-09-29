@@ -89,7 +89,6 @@ class MainActivity : ComponentActivity() {
                     var tilingFactorInput by remember { mutableStateOf(TextFieldValue(prefs.getInt("tiling_factor", initTilingFactor).toString())) }
                     var minNoiseBrightnessInput by remember { mutableStateOf(TextFieldValue(prefs.getInt("min_noise_brightness", initMinNoiseBrightness).toString())) }
                     var maxNoiseBrightnessInput by remember { mutableStateOf(TextFieldValue(prefs.getInt("max_noise_brightness", initMaxNoiseBrightness).toString())) }
-                    var rotationSupport by remember { mutableStateOf(prefs.getBoolean("rotation_support", initRotationSupport)) }
                     var blendModeInput by remember { mutableStateOf(prefs.getString("blend_mode", initBlendMode)) }
                     Column(
                         modifier = Modifier
@@ -286,29 +285,6 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                             }
-                            val interactionSource = remember { MutableInteractionSource() }
-                            Row(
-                                modifier = Modifier
-                                    .clickable(
-                                        interactionSource = interactionSource,
-                                        indication = null,
-                                        role = Role.Switch,
-                                        onClick = {
-                                            rotationSupport = !rotationSupport
-                                        }
-                                    ).fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(text = "Rotation Support")
-                                Spacer(modifier = Modifier.padding(start = 8.dp))
-                                Switch(
-                                    checked = rotationSupport,
-                                    onCheckedChange = {
-                                        rotationSupport = it
-                                    }
-                                )
-                            }
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth(),
@@ -372,7 +348,6 @@ class MainActivity : ComponentActivity() {
                                                 putInt("tiling_factor", tilingFactor)
                                                 putInt("min_noise_brightness", minNoiseBrightness)
                                                 putInt("max_noise_brightness", maxNoiseBrightness)
-                                                putBoolean("rotation_support", rotationSupport)
                                                 putString("blend_mode", blendModeInput)
                                                 apply()
                                             }

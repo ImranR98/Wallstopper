@@ -16,18 +16,17 @@ import kotlin.math.max
 
 val initColour = Color.parseColor("#1D0130")
 val initSecondaryColour = Color.parseColor("#FC056C")
-const val initStartX = 0
+const val initStartX = 50
 const val initStartY = 60
-const val initEndX = 50
+const val initEndX = 100
 const val initEndY = 100
 const val initFPS = 60
-const val initLoopSeconds = 3
+const val initLoopSeconds = 1
 const val initScaleFactor = 2
 const val initTilingFactor = 2
 const val initMinNoiseBrightness = 1
 const val initMaxNoiseBrightness = 23
 var initBlendMode = PorterDuff.Mode.SCREEN.name
-const val initRotationSupport = false
 
 class NoiseGenerationViewModel : ViewModel() {
     private val _value = MutableLiveData<Float?>()
@@ -59,7 +58,6 @@ class MyWallpaperService : WallpaperService() {
         private val prefs = getSharedPreferences("wallpaper_prefs", MODE_PRIVATE)
         private var wallpaperWidth: Int = 0
         private var wallpaperHeight: Int = 0
-        private var wallpaperLength: Int = 0
         private val coroutineScope = CoroutineScope(Dispatchers.Default + Job())
         private var currentFrameIndex = 0
         private var frameGenerationJob: Job? = null
@@ -73,7 +71,6 @@ class MyWallpaperService : WallpaperService() {
         private var loopSeconds = prefs.getInt("loop_seconds", initLoopSeconds)
         private var scaleFactor = prefs.getInt("scale_factor", initScaleFactor)
         private var tilingFactor = prefs.getInt("tiling_factor", initTilingFactor)
-        private var rotationSupport = prefs.getBoolean("rotation_support", initRotationSupport)
         private var minNoiseBrightness = prefs.getInt("min_noise_brightness", initMinNoiseBrightness)
         private var maxNoiseBrightness = prefs.getInt("max_noise_brightness", initMaxNoiseBrightness)
         private var gradientPaint = Paint()
@@ -101,12 +98,6 @@ class MyWallpaperService : WallpaperService() {
 
         override fun onSurfaceCreated(holder: SurfaceHolder) {
             super.onSurfaceCreated(holder)
-            wallpaperWidth = holder.surfaceFrame.width()
-            wallpaperHeight = holder.surfaceFrame.height()
-            wallpaperLength =  max(wallpaperWidth, wallpaperHeight)
-            generateGradient()
-            generateNoiseFrames()
-            draw()
             handler.post(animationRunnable)
         }
 
@@ -122,6 +113,21 @@ class MyWallpaperService : WallpaperService() {
             frameGenerationJob?.cancel()
             noiseFrames.forEach {
                 it?.recycle()
+            }
+        }
+
+        override fun onSurfaceChanged(
+            holder: SurfaceHolder,
+            format: Int,
+            width: Int,
+            height: Int
+        ) {
+            super.onSurfaceChanged(holder, format, width, height)
+            if (width != wallpaperWidth || height != wallpaperHeight) {
+                wallpaperWidth = width
+                wallpaperHeight = height
+                generateGradient()
+                generateNoiseFrames()
             }
         }
 
@@ -184,10 +190,6 @@ class MyWallpaperService : WallpaperService() {
                         blendMode = sharedPreferences.getString("blend_mode", initBlendMode)
                         noisePaint.setXfermode(PorterDuffXfermode(PorterDuff.Mode.entries.find { it.name == blendMode }))
                     }
-                    "rotation_support" -> {
-                        rotationSupport = sharedPreferences.getBoolean("rotation_support", initRotationSupport)
-                        regenerateNoise = true
-                    }
                 }
             }
             if (regenerateGradient) {
@@ -247,12 +249,10 @@ class MyWallpaperService : WallpaperService() {
         }
 
         private fun generateGradient() {
-            val width = if (rotationSupport) wallpaperLength else wallpaperWidth
-            val height = if (rotationSupport) wallpaperLength else wallpaperHeight
-            val startX = (startXPct / 100F) * width
-            val startY = (startYPct / 100F) * height
-            val endX = (endXPct / 100F) * width
-            val endY = (endYPct / 100F) * height
+            val startX = (startXPct / 100F) * wallpaperWidth
+            val startY = (startYPct / 100F) * wallpaperHeight
+            val endX = (endXPct / 100F) * wallpaperWidth
+            val endY = (endYPct / 100F) * wallpaperHeight
             val gradient = LinearGradient(
                 startX, startY, endX, endY,
                 backgroundColor, backgroundSecondaryColor,
@@ -265,10 +265,6 @@ class MyWallpaperService : WallpaperService() {
         private fun generateNoiseFrames() {
             var wallpaperTileWidth = wallpaperWidth / (tilingFactor * scaleFactor)
             var wallpaperTileHeight = wallpaperHeight / (tilingFactor * scaleFactor)
-            if (rotationSupport) {
-                wallpaperTileWidth =  wallpaperLength / (tilingFactor * scaleFactor)
-                wallpaperTileHeight = wallpaperTileWidth
-            }
             frameGenerationJob?.cancel()
             frameGenerationJob = CoroutineScope(Dispatchers.Default).launch {
                 for (i in noiseFrames.indices) {
