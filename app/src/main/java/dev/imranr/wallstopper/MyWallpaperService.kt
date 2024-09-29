@@ -23,7 +23,7 @@ const val initFPS = 60
 const val initLoopSeconds = 3
 const val initScaleFactor = 2
 const val initTilingFactor = 2
-const val initMaxNoiseBrightness = 100
+const val initMaxNoiseBrightness = 50
 const val initRotationSupport = false
 
 class NoiseGenerationViewModel : ViewModel() {
@@ -207,7 +207,7 @@ class MyWallpaperService : WallpaperService() {
                     for (j in i until end) {
                         // Generate random grayscale noise and make it semi-transparent
                         val noise = Random.nextInt(0, maxNoiseBrightness)
-                        pixels[j] = Color.argb(50, noise, noise, noise) // Alpha = 50 for transparency
+                        pixels[j] = Color.argb(100, noise, noise, noise) // Alpha = 50 for transparency
                     }
                 })
             }
