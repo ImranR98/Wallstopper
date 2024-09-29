@@ -1,6 +1,6 @@
 # Wallstopper
 
-A simple Android live wallpaper that shows random noise on a solid colour background.
+A simple Android live wallpaper that shows random noise on a coloured gradient.
 
 ## Screenshots
 
