@@ -22,12 +22,9 @@ import androidx.compose.ui.Alignment
 import android.widget.Toast
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.sp
 
@@ -36,7 +33,7 @@ class MainActivity : ComponentActivity() {
         NoiseGenerationViewModel.getInstance()
     }
 
-    @OptIn(ExperimentalStdlibApi::class, ExperimentalMaterial3Api::class)
+    @OptIn(ExperimentalStdlibApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)

@@ -6,13 +6,11 @@ import android.os.Looper
 import android.service.wallpaper.WallpaperService
 import android.view.SurfaceHolder
 import android.content.SharedPreferences
-import android.util.Log
 import kotlinx.coroutines.*
 import kotlin.random.Random
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
-import kotlin.math.max
 
 val initColour = Color.parseColor("#1D0130")
 val initSecondaryColour = Color.parseColor("#FC056C")
@@ -89,31 +87,16 @@ class MyWallpaperService : WallpaperService() {
         override fun onVisibilityChanged(visible: Boolean) {
             this.visible = visible
             if (visible) {
-                draw()
                 handler.post(animationRunnable)
             } else {
                 handler.removeCallbacks(animationRunnable)
             }
         }
 
-        override fun onSurfaceCreated(holder: SurfaceHolder) {
-            super.onSurfaceCreated(holder)
-            handler.post(animationRunnable)
-        }
-
         override fun onSurfaceDestroyed(holder: SurfaceHolder) {
             super.onSurfaceDestroyed(holder)
             handler.removeCallbacks(animationRunnable)
             visible = false
-        }
-
-        override fun onDestroy() {
-            super.onDestroy()
-            prefs.unregisterOnSharedPreferenceChangeListener(this)
-            frameGenerationJob?.cancel()
-            noiseFrames.forEach {
-                it?.recycle()
-            }
         }
 
         override fun onSurfaceChanged(
@@ -196,7 +179,6 @@ class MyWallpaperService : WallpaperService() {
                 generateGradient()
             }
             if (regenerateNoise) {
-                noiseFrames = arrayOfNulls(loopSeconds * fps)
                 generateNoiseFrames()
             }
         }
@@ -204,7 +186,24 @@ class MyWallpaperService : WallpaperService() {
         private val animationRunnable = object : Runnable {
             override fun run() {
                 if (visible && noiseFrames.isNotEmpty()) {
-                    draw()
+                    val holder = surfaceHolder
+                    val canvas: Canvas? = holder.lockCanvas()
+                    if (canvas != null) {
+                        try {
+                            noiseFrames[currentFrameIndex]?.let {
+                                canvas.drawRect(
+                                    0f,
+                                    0f,
+                                    wallpaperWidth.toFloat(),
+                                    wallpaperHeight.toFloat(),
+                                    gradientPaint
+                                )
+                                canvas.drawBitmap(it, 0f, 0f, noisePaint)
+                            }
+                        } finally {
+                            holder.unlockCanvasAndPost(canvas)
+                        }
+                    }
                     val nextFrameIndex = (currentFrameIndex + 1) % noiseFrames.size
                     currentFrameIndex = if (noiseFrames[nextFrameIndex] != null)  nextFrameIndex else 0
                     handler.postDelayed(this, 1000L / fps)
@@ -261,10 +260,13 @@ class MyWallpaperService : WallpaperService() {
             gradientPaint.shader = gradient
         }
 
-        @OptIn(ExperimentalStdlibApi::class)
         private fun generateNoiseFrames() {
-            var wallpaperTileWidth = wallpaperWidth / (tilingFactor * scaleFactor)
-            var wallpaperTileHeight = wallpaperHeight / (tilingFactor * scaleFactor)
+            noiseFrames.forEach {
+                it?.recycle()
+            }
+            noiseFrames = arrayOfNulls(loopSeconds * fps)
+            val wallpaperTileWidth = wallpaperWidth / (tilingFactor * scaleFactor)
+            val wallpaperTileHeight = wallpaperHeight / (tilingFactor * scaleFactor)
             frameGenerationJob?.cancel()
             frameGenerationJob = CoroutineScope(Dispatchers.Default).launch {
                 for (i in noiseFrames.indices) {
@@ -293,24 +295,12 @@ class MyWallpaperService : WallpaperService() {
             }
         }
 
-        private fun draw() {
-            val holder = surfaceHolder
-            val canvas: Canvas? = holder.lockCanvas()
-            if (canvas != null) {
-                try {
-                    noiseFrames[currentFrameIndex]?.let {
-                        canvas.drawRect(
-                            0f,
-                            0f,
-                            wallpaperWidth.toFloat(),
-                            wallpaperHeight.toFloat(),
-                            gradientPaint
-                        )
-                        canvas.drawBitmap(it, 0f, 0f, noisePaint)
-                    }
-                } finally {
-                    holder.unlockCanvasAndPost(canvas)
-                }
+        override fun onDestroy() {
+            super.onDestroy()
+            prefs.unregisterOnSharedPreferenceChangeListener(this)
+            frameGenerationJob?.cancel()
+            noiseFrames.forEach {
+                it?.recycle()
             }
         }
     }
